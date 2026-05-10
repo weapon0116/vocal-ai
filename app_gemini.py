@@ -56,7 +56,7 @@ def get_vocal_range(pitch):
 # 입력창
 _, input_col, _ = st.columns([1, 1.5, 1])
 with input_col:
-    audio_data = st.audio_input("2~3초간 마이크에 '아~' 소리를 내주세요!")
+    audio_data = st.audio_input("3초간 마이크에 '아~' 소리를 내주세요!")
 
 if audio_data:
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
