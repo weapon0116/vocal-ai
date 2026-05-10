@@ -40,9 +40,13 @@ st.markdown(f"""
     """, unsafe_allow_html=True)
 
 # --- [설정] Gemini API 키 ---
-GOOGLE_API_KEY = "AIzaSyDH4kTbM7iFPMKafjWE65tgjDEZqq-6kAg" 
-genai.configure(api_key=GOOGLE_API_KEY)
+if "GOOGLE_API_KEY" in st.secrets:
+    GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+else:
+    # 로컬 테스트용 (본인 컴퓨터에서 돌릴 때만 직접 입력)
+    GOOGLE_API_KEY = "새로_발급받은_키"
 
+genai.configure(api_key=GOOGLE_API_KEY)
 st.markdown('<h1 style="color: #0064FF; text-align: center;">🎤 음역대 분석 x Gemini AI</h1>', unsafe_allow_html=True)
 
 # --- 성부 판정 로직 ---
