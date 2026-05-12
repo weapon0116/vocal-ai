@@ -56,19 +56,22 @@ def play_piano_c4():
 # --- [4. 전역 레이아웃 설정 (CSS)] ---
 st.markdown("""
     <style>
-        .block-container { padding-top: 1rem; padding-bottom: 0rem; }
+        .block-container { padding-top: 1.5rem; padding-bottom: 0rem; }
         [data-testid="stHeader"] { background: rgba(0,0,0,0); }
         .report-box { 
             background-color: #1E1E1E; 
-            padding: 8px; 
+            padding: 10px; 
             border-radius: 8px; 
             border: 1px solid #333; 
             margin-bottom: 5px; 
-            text-align: center;
+            text-align: center; /* 텍스트 중앙 정렬 해결 */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
         h1 { margin-top: -45px; margin-bottom: 10px; }
         .stAudioInput { margin-bottom: -15px; }
-        .stTabs [data-baseweb="tab-list"] { gap: 10px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -100,15 +103,15 @@ with tab1:
             avg_f0 = np.nanmean(f0)
             gender_type, range_type = analyze_gender_by_c4(avg_f0)
 
-            # 상단 요약
+            # 상단 요약 (중앙 정렬 강화)
             res_c1, res_c2, res_c3 = st.columns(3)
-            with res_c1: st.markdown(f"<div class='report-box'><p style='margin:0; font-size:0.7rem; color:#AAA;'>성별</p><h4 style='margin:0;'>{gender_type}</h4></div>", unsafe_allow_html=True)
-            with res_c2: st.markdown(f"<div class='report-box'><p style='margin:0; font-size:0.7rem; color:#AAA;'>음역</p><h4 style='margin:0;'>{range_type}</h4></div>", unsafe_allow_html=True)
-            with res_c3: st.markdown(f"<div class='report-box'><p style='margin:0; font-size:0.7rem; color:#AAA;'>평균</p><h4 style='margin:0;'>{avg_f0:.1f}Hz</h4></div>", unsafe_allow_html=True)
+            with res_c1: st.markdown(f"<div class='report-box'><p style='margin:0; font-size:0.75rem; color:#AAA;'>성별</p><h3 style='margin:0;'>{gender_type}</h3></div>", unsafe_allow_html=True)
+            with res_c2: st.markdown(f"<div class='report-box'><p style='margin:0; font-size:0.75rem; color:#AAA;'>음역대</p><h3 style='margin:0;'>{range_type}</h3></div>", unsafe_allow_html=True)
+            with res_c3: st.markdown(f"<div class='report-box'><p style='margin:0; font-size:0.75rem; color:#AAA;'>평균 주파수</p><h3 style='margin:0;'>{avg_f0:.1f} Hz</h3></div>", unsafe_allow_html=True)
 
-            col_graph, col_ai = st.columns([1, 1], gap="small")
+            col_graph, col_ai = st.columns([1.1, 0.9], gap="medium")
             with col_graph:
-                fig1, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 3.2), gridspec_kw={'height_ratios': [1, 1.2]})
+                fig1, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 3.8), gridspec_kw={'height_ratios': [1, 1.2]})
                 librosa.display.waveshow(y, sr=sr, ax=ax1, color='#0064FF', alpha=0.5)
                 ax1.set_title('음성 파형', fontsize=8); ax1.tick_params(labelsize=6)
                 
@@ -117,10 +120,12 @@ with tab1:
                 ax2.plot(freqs, avg_D, color='#1F3A5A', linewidth=1); ax2.set_xlim(0, 1000)
                 if not np.isnan(avg_f0): ax2.axvline(x=avg_f0, color='red', linestyle='--', linewidth=1)
                 ax2.set_title('주파수 분석', fontsize=8); ax2.tick_params(labelsize=6)
-                plt.tight_layout(pad=0.3); st.pyplot(fig1)
+                plt.tight_layout(pad=0.5); st.pyplot(fig1)
 
             with col_ai:
-                with st.spinner('🤖 AI 분석 중...'):
+                st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True) # 박스 내리기용 간격
+                st.markdown("<h4 style='margin-bottom: -10px;'>📊 Gemini AI 보컬 리포트</h4>", unsafe_allow_html=True)
+                with st.spinner('🤖 분석 중...'):
                     model = genai.GenerativeModel("gemini-3.1-flash-lite")
                     sample_file = genai.upload_file(path=tmp_path)
                     prompt = f"데이터: {avg_f0:.1f}Hz, {gender_type}. 판정 이유와 어울리는 동물/가수를 3줄 이내 리스트로 짧게 작성."
@@ -134,7 +139,7 @@ with tab2:
     if 'target_hz' not in st.session_state:
         st.session_state.target_hz = round(random.uniform(140.0, 300.0), 2)
 
-    st.markdown(f"<h1 style='text-align: center; color: #FF4B4B; font-size: 3rem; margin-bottom: 0;'>🎯 {st.session_state.target_hz} Hz</h1>", unsafe_allow_html=True)
+    st.markdown(f"<h1 style='text-align: center; color: #FF4B4B; font-size: 2.8rem; margin-bottom: 0;'>🎯 {st.session_state.target_hz} Hz</h1>", unsafe_allow_html=True)
     
     col_ctrl, col_btn = st.columns([3, 1])
     with col_ctrl: st.caption("💡 목소리로 타겟 주파수를 맞추세요! (오차 ±10Hz)")
@@ -155,6 +160,8 @@ with tab2:
 
             if not np.isnan(avg_f0):
                 diff = abs(avg_f0 - st.session_state.target_hz)
+                
+                # 상단 결과창
                 res_col1, res_col2 = st.columns(2)
                 with res_col1:
                     st.markdown(f"<div class='report-box'><p style='margin:0; font-size: 0.8rem; color: #AAA;'>기록</p><h2 style='margin:0; font-size: 1.8rem;'>{avg_f0:.1f} Hz</h2></div>", unsafe_allow_html=True)
@@ -164,19 +171,30 @@ with tab2:
                     else:
                         st.markdown(f"<h2 style='color: #FF4B4B; margin-top: 10px; text-align: center;'>❌ 실패</h2>", unsafe_allow_html=True)
                 
-                # 게임 그래프 크기 극단적 축소 (figsize=(8, 1.6))
-                fig2, ax = plt.subplots(figsize=(8, 1.6)) 
-                D = np.abs(librosa.stft(y, n_fft=2048)); avg_D = np.mean(D, axis=1)
-                freqs = librosa.fft_frequencies(sr=sr, n_fft=2048)
-                ax.plot(freqs, avg_D, color='#1F3A5A', linewidth=1.2); ax.set_xlim(0, 600) 
-                ax.axvline(x=st.session_state.target_hz, color='orange', linewidth=2.5, label='TARGET')
-                ax.axvline(x=avg_f0, color='red', linestyle='--', linewidth=1.5, label='YOU')
-                ax.legend(prop={'size': 7}, loc='upper right'); ax.tick_params(labelsize=6)
-                plt.tight_layout(pad=0.2); st.pyplot(fig2)
+                # 하단 레이아웃 변경: [그래프(좌) | 텍스트 정보(우)]
+                graph_col, info_col = st.columns([1.5, 1])
                 
-                acc = max(0, min(100, (1 - (diff/50)) * 100))
-                st.write(f"<p style='font-size:0.8rem; margin:0;'>정확도: {acc:.1f}% | 오차: {diff:.1f}Hz</p>", unsafe_allow_html=True)
-                st.progress(acc/100)
+                with graph_col:
+                    # 그래프 높이 더 축소 (1.6 -> 1.4)
+                    fig2, ax = plt.subplots(figsize=(6, 1.4)) 
+                    D = np.abs(librosa.stft(y, n_fft=2048)); avg_D = np.mean(D, axis=1)
+                    freqs = librosa.fft_frequencies(sr=sr, n_fft=2048)
+                    ax.plot(freqs, avg_D, color='#1F3A5A', linewidth=1.2); ax.set_xlim(0, 600) 
+                    ax.axvline(x=st.session_state.target_hz, color='orange', linewidth=2.5, label='TARGET')
+                    ax.axvline(x=avg_f0, color='red', linestyle='--', linewidth=1.5, label='YOU')
+                    ax.legend(prop={'size': 6}, loc='upper right'); ax.tick_params(labelsize=5)
+                    plt.tight_layout(pad=0.1); st.pyplot(fig2)
+                
+                with info_col:
+                    acc = max(0, min(100, (1 - (diff/50)) * 100))
+                    st.markdown(f"""
+                        <div style='margin-top: 5px; padding: 10px; background: #262730; border-radius: 5px;'>
+                            <p style='margin:0; font-size: 0.9rem;'><b>🎯 분석 정보</b></p>
+                            <p style='margin:0; font-size: 0.8rem; color:#00CC66;'>정확도: {acc:.1f}%</p>
+                            <p style='margin:0; font-size: 0.8rem; color:#FF4B4B;'>오차: {diff:.1f} Hz</p>
+                        </div>
+                    """, unsafe_allow_html=True)
+                    st.progress(acc/100)
             else: st.warning("소리가 감지되지 않았습니다.")
         finally:
             if os.path.exists(game_tmp_path): os.remove(game_tmp_path)
