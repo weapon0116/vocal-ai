@@ -119,7 +119,7 @@ with tab1:
         finally:
             if os.path.exists(tmp_path): os.remove(tmp_path)
 
-# --- [탭 2: 게임 모드 (컴팩트 & 렉 제로)] ---
+# --- [탭 2: 게임 모드 (연산 부하 최소화)] ---
 with tab2:
     if 'target_hz' not in st.session_state:
         st.session_state.target_hz = round(random.uniform(160.0, 300.0), 1)
@@ -132,16 +132,25 @@ with tab2:
     """, unsafe_allow_html=True)
     
     if st.button("🔄 타겟 변경", use_container_width=True):
-        st.session_state.target_hz = round(random.uniform(160.0, 300.0), 1); st.rerun()
+        st.session_state.target_hz = round(random.uniform(160.0, 300.0), 1)
+        st.rerun()
 
+    # 1. 오디오 입력 받기
     game_audio = st.audio_input("도전!", key="game_input")
 
     if game_audio:
+        # 파일 저장 및 로딩 최적화
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
-            tmp_file.write(game_audio.getvalue()); g_path = tmp_file.name
+            tmp_file.write(game_audio.getvalue())
+            g_path = tmp_file.name
+        
         try:
-            y, sr = librosa.load(g_path, sr=16000, duration=2)
-            f0 = librosa.yin(y, fmin=100, fmax=500)
+            # 2. 분석 최적화: sr을 8000으로 낮춰서 데이터 양을 절반으로 줄임
+            y, sr = librosa.load(g_path, sr=8000, duration=1.5) 
+            
+            # 3. YIN 연산 최적화: hop_length를 키워서 연산 횟수 대폭 감소
+            # 이 정도만 해도 렉은 거의 사라집니다.
+            f0 = librosa.yin(y, fmin=100, fmax=400, sr=sr, hop_length=1024)
             avg_f0 = np.nanmean(f0)
 
             if not np.isnan(avg_f0):
@@ -153,6 +162,10 @@ with tab2:
                     st.markdown("<div style='text-align:center; color:#00FF88;' class='banner'>🎉 SUCCESS!</div>", unsafe_allow_html=True)
                 else:
                     st.markdown(f"<div style='text-align:center; color:#FFD700;' class='banner'>TRY AGAIN! (오차:{diff:.1f}Hz)</div>", unsafe_allow_html=True)
-            else: st.warning("소리를 감지하지 못했습니다.")
+            else:
+                st.warning("소리를 조금 더 길게 내주세요!")
+        except Exception:
+            st.error("분석 중 오류가 발생했습니다.")
         finally:
-            if os.path.exists(g_path): os.remove(g_path)
+            if os.path.exists(g_path):
+                os.remove(g_path)
