@@ -104,7 +104,7 @@ if audio_data:
         with col2:
             # [빙글빙글] 제미나이 분석 로딩창
             with st.spinner('🤖 Gemini AI가 음색을 리포팅하고 있습니다...'):
-                model = genai.GenerativeModel("gemini-1.5-flash") # 최신 모델명으로 권장
+                model = genai.GenerativeModel("gemini-3.1-flash-lite") # 최신 모델명으로 권장
                 sample_file = genai.upload_file(path=tmp_path)
                 
                 prompt = f"""
