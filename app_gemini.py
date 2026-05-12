@@ -60,7 +60,7 @@ def play_piano_c4():
     return tone / np.max(np.abs(tone)), sr
 
 # --- [4. 메인 화면 구성 (수정 전 재생바 스타일)] ---
-st.title("🎼 가온 도(C4) 기준 성별/음역대 정밀 분석 (v.py)")
+st.title("🎼 너의 목소리가 보여")
 
 if st.button("🎹 기준점: 가온 도(C4) 듣기"):
     audio_buffer, sr_p = play_piano_c4()
@@ -69,7 +69,7 @@ if st.button("🎹 기준점: 가온 도(C4) 듣기"):
 
 st.divider()
 
-audio_data = st.audio_input("마이크에 소리를 내라")
+audio_data = st.audio_input("가온 도(C4) 음으로 마이크에 '아~'소리를 내주세요.")
 
 if audio_data:
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
