@@ -115,7 +115,7 @@ with tab1:
             with a_col:
                 st.markdown("### 🤖 AI 리포트")
                 model = genai.GenerativeModel("gemini-3.1-flash-lite")
-                prompt = f"데이터: {avg_f0:.1f}Hz, {gender_type}, {range_type}. 판정이유, 어울리는 동물, 추천 국내가수(아이유/김동률 제외)를 3줄 이내로 위트있게 작성."
+                prompt = f"데이터: {avg_f0:.1f}Hz, {gender_type}, {range_type}. 판정이유, 비슷한 동물, 비슷한 가수(아이유/김동률 제외)를 3줄로 약간 위트있게 작성."
                 response = model.generate_content(prompt)
                 st.info(response.text)
         finally:
