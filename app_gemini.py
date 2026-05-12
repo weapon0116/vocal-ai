@@ -100,7 +100,7 @@ with tab1:
                 st.markdown("<h4 style='margin-top:10px; margin-bottom:5px; font-size:0.9rem;'>📊 Gemini AI 보컬 리포트</h4>", unsafe_allow_html=True)
                 with st.spinner('🤖 AI 작성 중...'):
                     # NotFound 에러 방지를 위해 1.5-flash 모델 사용
-                    model = genai.GenerativeModel("gemini-1.5-flash")
+                    model = genai.GenerativeModel("gemini-3.1-flash-lite")
                     prompt = f"데이터: {avg_f0:.1f}Hz, {gender_type}, {range_type}. 판정이유, 어울리는 동물, 추천 국내가수(아이유/김동률 제외하고 인디/록/아이돌 중 랜덤하게 1명)를 3줄 이내로 매우 짧게 작성해줘."
                     response = model.generate_content(prompt)
                     st.info(response.text)
