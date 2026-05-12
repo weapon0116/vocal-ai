@@ -32,7 +32,7 @@ if "GOOGLE_API_KEY" in st.secrets:
 else:
     st.error("⚠️ 시크릿 설정(Secrets)에서 GOOGLE_API_KEY를 입력해주세요.")
 
-# --- [3. 핵심 함수] ---
+# --- [3. 핵심 분석 함수] ---
 def analyze_vocal_fast(y, sr):
     f0 = librosa.yin(y, fmin=librosa.note_to_hz('C2'), fmax=librosa.note_to_hz('C6'))
     avg_f0 = np.nanmean(f0)
@@ -41,36 +41,32 @@ def analyze_vocal_fast(y, sr):
     vocal_range = "소프라노" if avg_f0 >= 440 else ("알토" if avg_f0 >= 261.63 else ("테너" if avg_f0 >= 130 else "베이스"))
     return avg_f0, gender, vocal_range
 
-# --- [4. CSS 디자인 (컴팩트 & 힙)] ---
+# --- [4. CSS 디자인] ---
 st.markdown("""
     <style>
         .block-container { padding-top: 1.5rem; }
-        /* 분석 리포트 박스 */
         .report-box { 
             background-color: #1E1E1E; padding: 15px; border-radius: 12px; 
             border: 1px solid #444; text-align: center; margin-bottom: 10px;
         }
-        /* 게임 모드 전용 대형 전광판 (사이즈 최적화) */
         .game-display {
             background: linear-gradient(145deg, #121212, #252525);
             padding: 20px; border-radius: 20px;
-            border: 2px solid #FF4B4B; text-align: center;
-            margin: 10px 0px;
+            border: 2px solid #FF4B4B; text-align: center; margin: 10px 0px;
         }
         .target-val { font-size: 3.5rem !important; font-weight: 900; color: #FF4B4B; }
         .my-val { font-size: 3rem !important; font-weight: 800; color: #00BFFF; }
         .banner { font-size: 2.5rem !important; font-weight: 900; margin-top: 10px; }
-        .stAudioInput { margin-top: -10px; }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("🎼 너의 목소리가 보여")
 tab1, tab2 = st.tabs(["🔍 보컬 분석", "🎯 주파수 게임"])
 
-# --- [탭 1: 분석 모드] ---
+# --- [탭 1: 분석 모드 (범례 복구 완료)] ---
 with tab1:
     col_l, col_r = st.columns([2, 1])
-    with col_l: st.caption("당신의 보컬 데이터를 정밀 분석하고 AI 리포트를 생성합니다.")
+    with col_l: st.caption("파형과 주파수 성분을 분석하여 당신의 보컬 특성을 진단합니다.")
     with col_r:
         if st.button("🎹 C4 기준음", use_container_width=True):
             st.audio(np.sin(2 * np.pi * 261.63 * np.arange(22050) / 44100), format="audio/wav", sample_rate=44100, autoplay=True)
@@ -90,15 +86,30 @@ with tab1:
             with res_c2: st.markdown(f"<div class='report-box'><small>음역대</small><h3>{range_type}</h3></div>", unsafe_allow_html=True)
             with res_c3: st.markdown(f"<div class='report-box'><small>주파수</small><h3>{avg_f0:.1f} Hz</h3></div>", unsafe_allow_html=True)
 
-            g_col, a_col = st.columns([1.2, 0.8])
+            g_col, a_col = st.columns([1.3, 0.7])
             with g_col:
-                fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6))
+                # [범례 핵심 복구 구간]
+                fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 7))
+                
+                # 그래프 1
                 librosa.display.waveshow(y, sr=sr, ax=ax1, color='#0064FF', alpha=0.5)
-                ax1.set_title('파형 분석'); D = np.abs(librosa.stft(y, n_fft=2048))
-                ax2.plot(librosa.fft_frequencies(sr=sr, n_fft=2048), np.mean(D, axis=1), color='#1F3A5A')
-                ax2.set_xlim(0, 1000); ax2.axvline(x=261.63, color='green', linestyle=':')
-                if not np.isnan(avg_f0): ax2.axvline(x=avg_f0, color='red', linestyle='--')
-                plt.tight_layout(); st.pyplot(fig)
+                ax1.set_title('보컬 에너지 파형', fontsize=12)
+                
+                # 그래프 2 (주파수 분석 + 범례 추가)
+                D = np.abs(librosa.stft(y, n_fft=2048))
+                ax2.plot(librosa.fft_frequencies(sr=sr, n_fft=2048), np.mean(D, axis=1), color='#1F3A5A', label='주파수 밀도')
+                ax2.set_xlim(0, 1000)
+                ax2.set_title('주파수 성분 분석', fontsize=12)
+                
+                # 가이드 라인 및 범례 설정
+                ax2.axvline(x=261.63, color='green', linestyle=':', linewidth=2, label='가온 도 (C4: 261.6Hz)')
+                if not np.isnan(avg_f0):
+                    ax2.axvline(x=avg_f0, color='red', linestyle='--', linewidth=2, label=f'내 목소리 피크 ({avg_f0:.1f}Hz)')
+                
+                ax2.legend(loc='upper right', fontsize=10) # 범례 강제 출력
+                plt.tight_layout()
+                st.pyplot(fig)
+
             with a_col:
                 st.markdown("### 🤖 AI 리포트")
                 model = genai.GenerativeModel("gemini-3.1-flash-lite")
@@ -108,14 +119,14 @@ with tab1:
         finally:
             if os.path.exists(tmp_path): os.remove(tmp_path)
 
-# --- [탭 2: 게임 모드 (컴팩트 사이즈 & 렉 제로)] ---
+# --- [탭 2: 게임 모드 (컴팩트 & 렉 제로)] ---
 with tab2:
     if 'target_hz' not in st.session_state:
         st.session_state.target_hz = round(random.uniform(160.0, 300.0), 1)
 
     st.markdown(f"""
         <div class='game-display'>
-            <p style='color:#888; margin-bottom:0;'>TARGET</p>
+            <p style='color:#888; margin-bottom:0;'>MISSION TARGET</p>
             <div class='target-val'>{st.session_state.target_hz} Hz</div>
         </div>
     """, unsafe_allow_html=True)
@@ -129,20 +140,19 @@ with tab2:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
             tmp_file.write(game_audio.getvalue()); g_path = tmp_file.name
         try:
-            # 렉 방지를 위해 분석 구간 최소화
             y, sr = librosa.load(g_path, sr=16000, duration=2)
             f0 = librosa.yin(y, fmin=100, fmax=500)
             avg_f0 = np.nanmean(f0)
 
             if not np.isnan(avg_f0):
                 diff = abs(avg_f0 - st.session_state.target_hz)
-                st.markdown(f"<div class='report-box'><small>나의 기록</small><div class='my-val'>{avg_f0:.1f} Hz</div></div>", unsafe_allow_html=True)
+                st.markdown(f"<div class='report-box'><small>나의 주파수</small><div class='my-val'>{avg_f0:.1f} Hz</div></div>", unsafe_allow_html=True)
                 
                 if diff <= 20:
                     st.balloons()
-                    st.markdown("<div style='text-align:center; color:#00FF88;' class='banner'>SUCCESS! 🎉</div>", unsafe_allow_html=True)
+                    st.markdown("<div style='text-align:center; color:#00FF88;' class='banner'>🎉 SUCCESS!</div>", unsafe_allow_html=True)
                 else:
-                    st.markdown(f"<div style='text-align:center; color:#FFD700;' class='banner'>TRY AGAIN (오차:{diff:.1f}Hz)</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='text-align:center; color:#FFD700;' class='banner'>TRY AGAIN! (오차:{diff:.1f}Hz)</div>", unsafe_allow_html=True)
             else: st.warning("소리를 감지하지 못했습니다.")
         finally:
             if os.path.exists(g_path): os.remove(g_path)
