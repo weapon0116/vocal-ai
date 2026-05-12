@@ -6,18 +6,41 @@ import matplotlib.pyplot as plt
 import google.generativeai as genai
 import tempfile
 import os
-import platform
+import matplotlib.font_manager as fm
 
-# --- [1. 시스템 및 보안 설정] ---
-if platform.system() == 'Windows':
-    plt.rc('font', family='Malgun Gothic')
-elif platform.system() == 'Darwin':
-    plt.rc('font', family='AppleGothic')
-else:
-    plt.rc('font', family='NanumGothic')
-plt.rcParams['axes.unicode_minus'] = False
+# --- [1. 시스템 설정: 한글 폰트 완벽 지원] ---
+# Streamlit Cloud (Ubuntu 기반)에서 한글 깨짐을 막기 위한 최적의 설정
+@st.cache_resource
+def set_korean_font():
+    # 1. 윈도우/맥/리눅스 환경별로 폰트를 자동 검색합니다.
+    # 리눅스(Streamlit Cloud)에서 가장 흔한 나눔고딕, 백묵, 드로이드 폰트 등을 찾습니다.
+    available_fonts = [f.name for f in fm.fontManager.ttflist]
+    target_fonts = [
+        'Malgun Gothic',     # Windows
+        'AppleGothic',      # macOS
+        'NanumGothic',      # Linux (Ubuntu)
+        'Noto Sans CJK KR', # Linux
+        'Baekmuk Batang',   # Linux
+        'Droid Sans Fallback'# Linux
+    ]
+    
+    selected_font = 'sans-serif' # 기본값
+    for tf in target_fonts:
+        if tf in available_fonts:
+            selected_font = tf
+            break
+            
+    plt.rc('font', family=selected_font)
+    plt.rcParams['axes.unicode_minus'] = False # 마이너스 기호 깨짐 방지
+    
+    if selected_font == 'sans-serif':
+        st.warning("⚠️ 서버에 한글 폰트가 설치되지 않아 그래프의 한글이 깨질 수 있습니다. 'requirements.txt'에 'fonts-nanum' 등이 필요할 수 있습니다.")
+    else:
+        st.success(f"✅ 그래프 한글 폰트 '{selected_font}' 설정 완료.")
 
-# [보안] API 키 숨기기 (Secrets 서랍에서 가져오기)
+set_korean_font()
+
+# [보안] API 키 숨기기
 if "GOOGLE_API_KEY" in st.secrets:
     GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=GOOGLE_API_KEY)
@@ -32,8 +55,10 @@ def analyze_gender_by_c4(avg_f0):
     if np.isnan(avg_f0):
         return "측정 불가", "알 수 없음"
     
+    # 가온 도(C4) 기준 물리적 판정
     gender = "남성형 (Male-like)" if avg_f0 < C4_HZ else "여성형 (Female-like)"
     
+    # 세부 음역대 판정
     if avg_f0 >= 261.63:
         vocal_range = "소프라노 (Soprano)" if avg_f0 >= 440 else "알토 (Alto)"
     else:
@@ -59,6 +84,15 @@ if st.button("🎹 기준점: 가온 도(C4) 듣기"):
 
 st.divider()
 
+# 디자인 최적화 (상단 여백 줄이기)
+st.markdown("""
+<style>
+    .reportview-container .main .block-container{
+        padding-top: 2rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 audio_data = st.audio_input("마이크에 소리를 내주세요")
 
 if audio_data:
@@ -77,15 +111,19 @@ if audio_data:
 
         # 결과 표시
         st.subheader(f"✅ 분석 결과: {gender_type} / {range_type}")
-        st.write(f"평균 주파수: **{avg_f0:.2f} Hz** (가온 도 261.63 Hz 대비 {'낮음' if avg_f0 < 261.63 else '높음'})")
+        # 한 줄 공백 제거 및 폰트 미세 조정
+        st.markdown(f"평균 주파수: **{avg_f0:.2f} Hz** (가온 도 261.63 Hz 대비 {'낮음' if avg_f0 < 261.63 else '높음'})", unsafe_allow_html=True)
         
         col1, col2 = st.columns([1.2, 0.8])
         
         with col1:
             fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
+            
+            # 그래프 1: 시간축 파형
             librosa.display.waveshow(y, sr=sr, ax=ax1, color='#0064FF', alpha=0.9)
             ax1.set_title('그래프 1: 음성 에너지 파형', fontsize=12)
             
+            # 그래프 2: 주파수 스펙트럼 (0~2000Hz)
             n_fft = 2048
             D = np.abs(librosa.stft(y, n_fft=n_fft))
             avg_D = np.mean(D, axis=1)
@@ -94,24 +132,35 @@ if audio_data:
             ax2.plot(freqs, avg_D, color='#1F3A5A', linewidth=2)
             ax2.set_xlim(0, 2000)
             ax2.set_title('그래프 2: 주파수 성분 분석 (진동수 vs 진폭)', fontsize=12)
+            ax2.set_xlabel('진동수 (Hz)')
+            ax2.set_ylabel('진폭 (Amplitude)')
+            
+            # 가온 도(C4) 기준선 표시 (초록색, 범례 추가)
             ax2.axvline(x=261.63, color='green', linestyle=':', label='가온 도 (C4)')
+            # 사용자 평균 피크 표시 (빨간색, 범례 추가)
             if not np.isnan(avg_f0):
                 ax2.axvline(x=avg_f0, color='red', linestyle='--', label=f'내 목소리: {avg_f0:.1f}Hz')
+            
+            # 한글 깨짐 방지된 범례 표시
             ax2.legend()
+            
             plt.tight_layout()
             st.pyplot(fig)
 
         with col2:
             # [빙글빙글] 제미나이 분석 로딩창
             with st.spinner('🤖 Gemini AI가 음색을 리포팅하고 있습니다...'):
-                model = genai.GenerativeModel("gemini-3.1-flash-lite") # 최신 모델명으로 권장
+                # 사용자 요청 모델 명시: gemini-3.1-flash-lite
+                model = genai.GenerativeModel("gemini-3.1-flash-lite")
                 sample_file = genai.upload_file(path=tmp_path)
                 
                 prompt = f"""
+                당신은 칭찬에 후한 보컬 코치입니다. 서론 없이 '결론'만 말하세요.
+                모든 답변은 짧고 강렬하게, 장점만 언급하세요.
+
                 분석 데이터: {avg_f0:.2f}Hz ({gender_type}).
-                1. [물리적 판정]: 왜 이 목소리가 {gender_type}로 분류되는지 가온 도(261.63Hz)와 비교하여 설명해라.
-                2. [동물/가수 매칭]: 성별과 음색에 딱 맞는 동물 1마리와 가수 1명을 추천해라.
-                상남자 스타일로 짧고 굵게 답변해라.
+                1. [물리적 판정]: 왜 이 목소리가 {gender_type}로 분류되는지 가온 도(261.63Hz)와 짧게 비교.
+                2. [동물/가수 매칭]: 성별과 음색에 딱 맞는 동물 1마리와 가수 1명 추천.
                 """
                 
                 response = model.generate_content([sample_file, prompt])
@@ -121,5 +170,6 @@ if audio_data:
     except Exception as e:
         st.error(f"오류 발생: {e}")
     finally:
+        # 임시 파일 삭제
         if os.path.exists(tmp_path): 
             os.remove(tmp_path)
