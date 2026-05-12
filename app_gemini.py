@@ -9,6 +9,8 @@ import os
 import platform
 import matplotlib.font_manager as fm
 import random
+import scipy.io.wavfile as wav
+import io
 
 # --- [1. 시스템 및 한글 폰트 설정] ---
 st.set_page_config(page_title="V-RAP: AI Vocal Analyzer", layout="wide")
@@ -119,7 +121,7 @@ with tab1:
         finally:
             if os.path.exists(tmp_path): os.remove(tmp_path)
 
-# --- [탭 2: 게임 모드 (초광속 알고리즘 적용)] ---
+# --- [탭 2: 게임 모드 (초경량 엔진)] ---
 with tab2:
     if 'target_hz' not in st.session_state:
         st.session_state.target_hz = round(random.uniform(160.0, 300.0), 1)
@@ -135,44 +137,46 @@ with tab2:
         st.session_state.target_hz = round(random.uniform(160.0, 300.0), 1)
         st.rerun()
 
-    game_audio = st.audio_input("도전!", key="game_input")
+    # 렉의 주범인 st.audio_input 처리 최적화
+    game_audio = st.audio_input("지금 바로 소리내고 체크하세요!", key="game_input")
 
     if game_audio:
-        # 파일 저장 및 읽기 시간을 줄이기 위해 BytesIO 대신 임시파일 사용 (유지)
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
-            tmp_file.write(game_audio.getvalue())
-            g_path = tmp_file.name
-        
         try:
-            # [최적화 1] 8000Hz로 로드 + 1초만 분석 (데이터량 75% 감소)
-            y, sr = librosa.load(g_path, sr=8000, duration=1.0)
+            # [초고속 로드] librosa 대신 scipy 사용 (파일 저장 없이 메모리에서 바로 읽기)
+            audio_bytes = game_audio.read()
+            sr, y = wav.read(io.BytesIO(audio_bytes))
             
-            # [최적화 2] 복잡한 librosa 알고리즘 대신 순수 넘파이 자기상관 사용 (초고속)
-            # 피치 검출을 위한 가장 가벼운 수학적 방법입니다.
-            def get_pitch_fast(y, sr):
-                if len(y) < 512: return np.nan
-                corr = np.correlate(y, y, mode='full')[len(y)-1:]
-                d = np.diff(corr)
-                start = np.where(d > 0)[0][0] if len(np.where(d > 0)[0]) > 0 else 0
-                peak = np.argmax(corr[start:]) + start
-                return sr / peak if peak > 0 else np.nan
-
-            avg_f0 = get_pitch_fast(y, sr)
-
-            # 결과가 너무 튀는 것 방지 (상식적인 음성 범위 80~500Hz)
-            if not np.isnan(avg_f0) and 80 < avg_f0 < 500:
-                diff = abs(avg_f0 - st.session_state.target_hz)
-                st.markdown(f"<div class='report-box'><small>나의 주파수</small><div class='my-val'>{avg_f0:.1f} Hz</div></div>", unsafe_allow_html=True)
+            # 스테레오일 경우 모노로 변환
+            if len(y.shape) > 1: y = y[:, 0]
+            
+            # [초고속 분석] 데이터 0.5초만 딱 잘라서 자기상관법 계산
+            y = y[:int(sr * 0.5)].astype(float)
+            y -= np.mean(y) # DC offset 제거
+            
+            # 자기상관 (Numpy 최적화)
+            corr = np.correlate(y, y, mode='full')[len(y)-1:]
+            d = np.diff(corr)
+            start = np.where(d > 0)[0][0] if len(np.where(d > 0)[0]) > 0 else 0
+            peak = np.argmax(corr[start:]) + start
+            
+            if peak > 0:
+                avg_f0 = sr / peak
                 
-                if diff <= 20:
-                    st.balloons()
-                    st.markdown("<div style='text-align:center; color:#00FF88;' class='banner'>🎉 SUCCESS!</div>", unsafe_allow_html=True)
+                # 유효 주파수 범위 체크 (사람 목소리 범위)
+                if 80 < avg_f0 < 500:
+                    diff = abs(avg_f0 - st.session_state.target_hz)
+                    
+                    st.markdown(f"<div class='report-box'><small>나의 기록</small><div class='my-val'>{avg_f0:.1f} Hz</div></div>", unsafe_allow_html=True)
+                    
+                    if diff <= 20:
+                        st.balloons()
+                        st.markdown("<div style='text-align:center; color:#00FF88;' class='banner'>🎉 SUCCESS!</div>", unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"<div style='text-align:center; color:#FFD700;' class='banner'>오차: {diff:.1f} Hz</div>", unsafe_allow_html=True)
                 else:
-                    st.markdown(f"<div style='text-align:center; color:#FFD700;' class='banner'>TRY AGAIN! (오차:{diff:.1f}Hz)</div>", unsafe_allow_html=True)
+                    st.warning("목소리가 너무 낮거나 높습니다. 다시 시도해 주세요!")
             else:
-                st.warning("목소리를 조금 더 선명하게 내주세요!")
-        except Exception:
-            st.error("분석 실패! 다시 시도해주세요.")
-        finally:
-            if os.path.exists(g_path):
-                os.remove(g_path)
+                st.warning("소리가 너무 작습니다.")
+                
+        except Exception as e:
+            st.error("데이터 처리 중 렉이 발생했습니다. 다시 녹음해 주세요.")
