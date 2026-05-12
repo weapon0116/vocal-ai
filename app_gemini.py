@@ -103,7 +103,7 @@ with tab1:
             with col_ai:
                 st.markdown("<h4 style='margin-top:10px; margin-bottom:5px; font-size:0.9rem;'>📊 AI 보컬 리포트</h4>", unsafe_allow_html=True)
                 with st.spinner('🤖 리포트 작성 중...'):
-                    model = genai.GenerativeModel("gemini-1.5-flash")
+                    model = genai.GenerativeModel("gemini-3.1-flash-lite")
                     prompt = f"데이터: {avg_f0:.1f}Hz, {gender_type}, {range_type}. 판정이유, 어울리는 동물, 추천 국내가수(아이유/김동률 제외하고 랜덤하게)를 3줄 이내로 매우 짧게 작성."
                     response = model.generate_content(prompt)
                     st.info(response.text)
