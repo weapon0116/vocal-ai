@@ -8,9 +8,6 @@ import tempfile
 import os
 import platform
 import matplotlib.font_manager as fm
-import base64
-import io
-import scipy.io.wavfile as wav
 
 # --- [1. 시스템 및 폰트 설정] ---
 st.set_page_config(page_title="vocal_ai", layout="wide")
@@ -43,7 +40,7 @@ if "GOOGLE_API_KEY" in st.secrets:
 else:
     st.error("⚠️ 시크릿 설정(Secrets)에서 GOOGLE_API_KEY를 확인해주세요.")
 
-# --- [3. 핵심 함수] ---
+# --- [3. 핵심 함수: 가온 도 기준 분석] ---
 def analyze_gender_by_c4(avg_f0):
     C4_HZ = 261.63
     if np.isnan(avg_f0): return "측정 불가", "알 수 없음"
@@ -62,26 +59,12 @@ def play_piano_c4():
     tone = tone * np.exp(-4 * t)
     return tone / np.max(np.abs(tone)), sr
 
-# --- [4. 메인 화면 구성] ---
+# --- [4. 메인 화면 구성 (친구 버전 텍스트 롤백)] ---
 st.title("🎼 가온 도(C4) 기준 성별/음역대 정밀 분석 (v.py)")
 
-# 버튼 클릭 시 재생바 없이 소리만 즉시 재생
 if st.button("🎹 기준점: 가온 도(C4) 듣기"):
     audio_buffer, sr_p = play_piano_c4()
-    
-    # WAV 데이터를 바이너리로 변환 후 base64 인코딩
-    virtual_file = io.BytesIO()
-    wav.write(virtual_file, sr_p, (audio_buffer * 32767).astype(np.int16))
-    b64 = base64.b64encode(virtual_file.getvalue()).decode()
-    
-    # HTML5 오디오 태그를 이용해 재생바 숨기고 자동 재생
-    md = f"""
-        <audio autoplay="true">
-        <source src="data:audio/wav;base64,{b64}" type="audio/wav">
-        </audio>
-    """
-    st.markdown(md, unsafe_allow_html=True)
-    st.success("🎹 가온 도(C4) 음원 재생 중...")
+    st.audio(audio_buffer, format="audio/wav", sample_rate=sr_p, autoplay=True)
 
 st.divider()
 
@@ -121,19 +104,15 @@ if audio_data:
             ax2.set_title('그래프 2: 주파수 성분 분석 (진동수 vs 진폭)', fontsize=12)
             ax2.set_xlabel('진동수 (Hz)')
             ax2.set_ylabel('진폭 (Amplitude)')
-            
-            # 한글 범례 설정
             ax2.axvline(x=261.63, color='green', linestyle=':', label='가온 도 (C4)')
             if not np.isnan(avg_f0):
                 ax2.axvline(x=avg_f0, color='red', linestyle='--', label=f'내 목소리 피크: {avg_f0:.1f}Hz')
             ax2.legend()
-            
             plt.tight_layout()
             st.pyplot(fig)
 
         with col2:
             with st.spinner('🤖 Gemini AI 보컬 리포트 생성 중...'):
-                # 모델명: gemini-3.1-flash-lite
                 model = genai.GenerativeModel("gemini-3.1-flash-lite")
                 sample_file = genai.upload_file(path=tmp_path)
                 
