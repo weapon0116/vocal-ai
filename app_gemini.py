@@ -34,7 +34,7 @@ else:
 
 # --- [3. 핵심 분석 함수 (YIN 알고리즘으로 렉 제거)] ---
 def analyze_vocal_fast(y, sr):
-    # 연산량을 줄이기 위해 yin 사용
+    # 연산량을 줄이기 위해 yin 사용 (pyin보다 훨씬 빠름)
     f0 = librosa.yin(y, fmin=librosa.note_to_hz('C2'), fmax=librosa.note_to_hz('C6'))
     avg_f0 = np.nanmean(f0)
     
@@ -80,8 +80,7 @@ with tab1:
 
         try:
             with st.spinner('⚡ 분석 중...'):
-                # 렉 방지를 위해 3초만 로드
-                y, sr = librosa.load(tmp_path, sr=16000, duration=3)
+                y, sr = librosa.load(tmp_path, sr=16000, duration=3) # 3초만 로드해서 렉 방지
                 avg_f0, gender_type, range_type = analyze_vocal_fast(y, sr)
 
             res_c1, res_c2, res_c3 = st.columns(3)
@@ -91,18 +90,18 @@ with tab1:
 
             col_graph, col_ai = st.columns([1, 1], gap="small")
             with col_graph:
-                # [수정] 분석 그래프 크기 대폭 축소
+                # [수정] 분석 그래프 높이를 1.5로 대폭 축소
                 fig1, ax = plt.subplots(figsize=(4, 1.5))
                 librosa.display.waveshow(y, sr=sr, ax=ax, color='#0064FF', alpha=0.5)
                 ax.set_title('보컬 파형', fontsize=8); ax.tick_params(labelsize=6)
                 plt.tight_layout(); st.pyplot(fig1)
 
             with col_ai:
-                st.markdown("<h4 style='margin-top:10px; margin-bottom:5px; font-size:0.9rem;'>📊 AI 보컬 리포트</h4>", unsafe_allow_html=True)
+                st.markdown("<h4 style='margin-top:10px; margin-bottom:5px; font-size:0.9rem;'>📊 Gemini AI 보컬 리포트</h4>", unsafe_allow_html=True)
                 with st.spinner('🤖 AI 작성 중...'):
-                    # NotFound 에러 해결을 위해 안정적인 모델명 사용
+                    # NotFound 에러 방지를 위해 1.5-flash 모델 사용
                     model = genai.GenerativeModel("gemini-1.5-flash")
-                    prompt = f"데이터: {avg_f0:.1f}Hz, {gender_type}, {range_type}. 판정이유, 어울리는 동물, 추천 국내가수(아이유/김동률 제외하고 랜덤하게)를 3줄 이내로 짧게 작성해줘."
+                    prompt = f"데이터: {avg_f0:.1f}Hz, {gender_type}, {range_type}. 판정이유, 어울리는 동물, 추천 국내가수(아이유/김동률 제외하고 인디/록/아이돌 중 랜덤하게 1명)를 3줄 이내로 매우 짧게 작성해줘."
                     response = model.generate_content(prompt)
                     st.info(response.text)
         finally:
@@ -128,7 +127,7 @@ with tab2:
             tmp_file.write(audio_data_2.getvalue()); game_tmp_path = tmp_file.name
 
         try:
-            # 렉 최소화 (3초 제한)
+            # 렉 최소화 (3초 제한 및 yin 사용)
             y, sr = librosa.load(game_tmp_path, sr=16000, duration=3)
             f0 = librosa.yin(y, fmin=librosa.note_to_hz('C2'), fmax=librosa.note_to_hz('C6'))
             avg_f0 = np.nanmean(f0)
@@ -139,21 +138,23 @@ with tab2:
                 c1, c2 = st.columns(2)
                 with c1: st.markdown(f"<div class='report-box'>내 기록<h2 style='margin:0;'>{avg_f0:.1f} Hz</h2></div>", unsafe_allow_html=True)
                 with c2:
+                    # 오차범위 20Hz 적용
                     if diff <= 20: 
                         st.balloons()
                         st.markdown(f"<div class='report-box' style='border-color:#00CC66;'><h2 style='color:#00CC66; margin:0;'>SUCCESS!</h2></div>", unsafe_allow_html=True)
                     else: st.markdown(f"<div class='report-box' style='border-color:#FF4B4B;'><h2 style='color:#FF4B4B; margin:0;'>TRY AGAIN</h2></div>", unsafe_allow_html=True)
                 
-                # [수정] 게임 그래프 초슬림화 및 축 제거 (잘림 방지)
+                # [수정] 게임 그래프 초슬림화 및 여백 제거 (잘림 방지)
                 graph_col, info_col = st.columns([2, 1])
                 with graph_col:
                     fig2, ax = plt.subplots(figsize=(5, 0.6))
-                    ax.plot(y[:8000], color='#1F3A5A', linewidth=0.5) # 파형만 살짝 표시
-                    ax.axvline(x=4000, color='red', alpha=0.3) # 디자인용
+                    ax.plot(y[:8000], color='#1F3A5A', linewidth=0.5) 
                     ax.axis('off'); plt.tight_layout(pad=0); st.pyplot(fig2)
                 
                 with info_col:
                     acc = max(0, min(100, (1 - (diff/60)) * 100))
                     st.markdown(f"<p style='font-size:0.8rem; margin:0;'>정확도: {acc:.1f}% | 오차: {diff:.1f}Hz</p>", unsafe_allow_html=True)
                     st.progress(acc/100)
-            else: st.warning("소리가 너무 작습니다
+            else: st.warning("소리가 너무 작습니다. 조금 더 크게 소리 내주세요!")
+        finally:
+            if os.path.exists(game_tmp_path): os.remove(game_tmp_path)
