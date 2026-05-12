@@ -115,7 +115,7 @@ with tab1:
             with a_col:
                 st.markdown("### 🤖 AI 리포트")
                 model = genai.GenerativeModel("gemini-3.1-flash-lite")
-                prompt = f"데이터: {avg_f0:.1f}Hz, {gender_type}, {range_type}. 다른 말은 하지 않고 판정이유, 비슷한 동물, 비슷한 가수를 3줄로 약간 위트있게 작성."
+                prompt = f"데이터: {avg_f0:.1f}Hz, {gender_type}, {range_type}. 다른 말은 하지 않고 1. 판정이유, 2. 비슷한 동물, 3. 비슷한 가수를 3줄로 형식에 맞추어 너무 길지 않게 약간 위트있게 작성."
                 response = model.generate_content(prompt)
                 st.info(response.text)
         finally:
