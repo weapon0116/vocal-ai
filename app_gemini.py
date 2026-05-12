@@ -9,26 +9,26 @@ import os
 import platform
 import matplotlib.font_manager as fm
 
-# --- [1. 시스템 및 폰트 설정] ---
+# --- [1. 시스템 및 한글 폰트 설정] ---
 st.set_page_config(page_title="vocal_ai", layout="wide")
-
-# 디자인 최적화 (상단 여백 조정)
-st.markdown("""
-    <style>
-    .main .block-container { padding-top: 2rem; }
-    </style>
-    """, unsafe_allow_html=True)
 
 @st.cache_resource
 def set_korean_font():
-    # 리눅스(Streamlit Cloud) 및 로컬 환경 한글 폰트 설정
-    font_path = '/usr/share/fonts/truetype/nanum/NanumGothic.ttf'
-    if os.path.exists(font_path):
-        font_prop = fm.FontProperties(fname=font_path)
+    # 1. 리눅스 서버(Streamlit Cloud) 나눔폰트 경로
+    linux_font_path = '/usr/share/fonts/truetype/nanum/NanumGothic.ttf'
+    
+    if os.path.exists(linux_font_path):
+        # 서버 환경: 설치된 나눔고딕 등록
+        font_prop = fm.FontProperties(fname=linux_font_path)
         plt.rc('font', family=font_prop.get_name())
     else:
-        if platform.system() == 'Windows': plt.rc('font', family='Malgun Gothic')
-        elif platform.system() == 'Darwin': plt.rc('font', family='AppleGothic')
+        # 로컬 환경 (Windows/Mac)
+        if platform.system() == 'Windows':
+            plt.rc('font', family='Malgun Gothic')
+        elif platform.system() == 'Darwin':
+            plt.rc('font', family='AppleGothic')
+    
+    # 마이너스 기호 깨짐 방지
     plt.rcParams['axes.unicode_minus'] = False
 
 set_korean_font()
@@ -40,7 +40,7 @@ if "GOOGLE_API_KEY" in st.secrets:
 else:
     st.error("⚠️ 시크릿 설정(Secrets)에서 GOOGLE_API_KEY를 확인해주세요.")
 
-# --- [3. 핵심 함수: 가온 도 기준 분석] ---
+# --- [3. 핵심 함수] ---
 def analyze_gender_by_c4(avg_f0):
     C4_HZ = 261.63
     if np.isnan(avg_f0): return "측정 불가", "알 수 없음"
@@ -59,11 +59,12 @@ def play_piano_c4():
     tone = tone * np.exp(-4 * t)
     return tone / np.max(np.abs(tone)), sr
 
-# --- [4. 메인 화면 구성 (친구 버전 텍스트 롤백)] ---
+# --- [4. 메인 화면 구성 (수정 전 재생바 스타일)] ---
 st.title("🎼 가온 도(C4) 기준 성별/음역대 정밀 분석 (v.py)")
 
 if st.button("🎹 기준점: 가온 도(C4) 듣기"):
     audio_buffer, sr_p = play_piano_c4()
+    # 수정 전 스타일: 재생바가 그대로 노출됩니다.
     st.audio(audio_buffer, format="audio/wav", sample_rate=sr_p, autoplay=True)
 
 st.divider()
@@ -104,10 +105,13 @@ if audio_data:
             ax2.set_title('그래프 2: 주파수 성분 분석 (진동수 vs 진폭)', fontsize=12)
             ax2.set_xlabel('진동수 (Hz)')
             ax2.set_ylabel('진폭 (Amplitude)')
+            
+            # 범례에 한글 적용
             ax2.axvline(x=261.63, color='green', linestyle=':', label='가온 도 (C4)')
             if not np.isnan(avg_f0):
                 ax2.axvline(x=avg_f0, color='red', linestyle='--', label=f'내 목소리 피크: {avg_f0:.1f}Hz')
             ax2.legend()
+            
             plt.tight_layout()
             st.pyplot(fig)
 
