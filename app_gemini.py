@@ -70,7 +70,6 @@ with tab1:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
             tmp_file.write(audio_data_1.getvalue())
             tmp_path = tmp_file.name
-
         try:
             with st.spinner('🔍 주파수 분석 중...'):
                 y, sr = librosa.load(tmp_path, sr=16000)
@@ -78,16 +77,12 @@ with tab1:
                 f0, _, _ = librosa.pyin(y, fmin=librosa.note_to_hz('C2'), fmax=librosa.note_to_hz('C6'))
                 avg_f0 = np.nanmean(f0)
                 gender_type, range_type = analyze_gender_by_c4(avg_f0)
-
             st.subheader(f"📊 분석 결과: {gender_type} / {range_type}")
             st.write(f"평균 주파수: **{avg_f0:.2f} Hz**")
-            
             col1, col2 = st.columns([1.2, 0.8], gap="medium")
             with col1:
-                fig1, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 7)) # 그래프 크기 살짝 조정
+                fig1, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 7))
                 librosa.display.waveshow(y, sr=sr, ax=ax1, color='#0064FF', alpha=0.8)
-                ax1.set_title('음성 에너지 파형')
-                
                 n_fft = 2048
                 D = np.abs(librosa.stft(y, n_fft=n_fft))
                 avg_D = np.mean(D, axis=1)
@@ -99,7 +94,6 @@ with tab1:
                     ax2.axvline(x=avg_f0, color='red', linestyle='--', label=f'내 목소리: {avg_f0:.1f}Hz')
                 ax2.legend()
                 st.pyplot(fig1)
-
             with col2:
                 with st.spinner('🤖 Gemini AI 보컬 리포트 생성 중...'):
                     model = genai.GenerativeModel("gemini-3.1-flash-lite")
@@ -113,24 +107,21 @@ with tab1:
 
 # --- [탭 2: 주파수 맞추기 게임] ---
 with tab2:
-    st.header("🎯 타겟 주파수를 맞춰라!")
-    
     if 'target_hz' not in st.session_state:
-        st.session_state.target_hz = round(random.uniform(130.0, 330.0), 2)
+        st.session_state.target_hz = round(random.uniform(140.0, 300.0), 2)
 
-    # 상단 타겟 표시 섹션 (크게 강조)
-    c1, c2 = st.columns([2, 1])
-    with c1:
-        st.markdown(f"<h1 style='text-align: center; color: #FF4B4B;'>TARGET: {st.session_state.target_hz} Hz</h1>", unsafe_allow_html=True)
-    with c2:
+    # UI 레이아웃 최적화 (한 화면에 다 보이게 높이 조절)
+    st.markdown(f"<h1 style='text-align: center; color: #FF4B4B; margin-bottom: 0px;'>🎯 TARGET: {st.session_state.target_hz} Hz</h1>", unsafe_allow_html=True)
+    
+    col_ctrl, col_btn = st.columns([3, 1])
+    with col_ctrl:
+        st.write(f"💡 **미션:** 목소리를 내어 타겟 주파수를 맞추세요! (허용 오차: ±10Hz)")
+    with col_btn:
         if st.button("🔄 타겟 변경", use_container_width=True):
-            st.session_state.target_hz = round(random.uniform(130.0, 330.0), 2)
+            st.session_state.target_hz = round(random.uniform(140.0, 300.0), 2)
             st.rerun()
 
-    st.write(f"💡 **미션:** 목소리를 내어 **{st.session_state.target_hz}Hz**에 맞춰보세요! (허용 오차: ±10Hz)")
-    st.divider()
-
-    audio_data_2 = st.audio_input("마이크에 소리를 내주세요. (게임용)", key="input_game")
+    audio_data_2 = st.audio_input("마이크에 소리를 내주세요.", key="input_game")
 
     if audio_data_2:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
@@ -139,45 +130,41 @@ with tab2:
 
         try:
             y, sr = librosa.load(game_tmp_path, sr=16000)
-            y, _ = librosa.effects.trim(y)
             f0, _, _ = librosa.pyin(y, fmin=librosa.note_to_hz('C2'), fmax=librosa.note_to_hz('C6'))
             avg_f0 = np.nanmean(f0)
 
             if not np.isnan(avg_f0):
                 diff = abs(avg_f0 - st.session_state.target_hz)
                 
-                # 결과 폰트 크기 강조
-                st.markdown(f"<h2 style='text-align: center;'>나의 기록: {avg_f0:.2f} Hz</h2>", unsafe_allow_html=True)
+                # 결과 강조 구역
+                res_col1, res_col2 = st.columns(2)
+                with res_col1:
+                    st.markdown(f"<h2 style='text-align: center;'>기록: {avg_f0:.2f} Hz</h2>", unsafe_allow_html=True)
+                with res_col2:
+                    if diff <= 10:
+                        st.balloons()
+                        st.markdown(f"<h2 style='text-align: center; color: #00CC66;'>🎊 성공! (차이: {diff:.2f}Hz)</h2>", unsafe_allow_html=True)
+                    else:
+                        st.markdown(f"<h2 style='text-align: center; color: #FF4B4B;'>실패 (차이: {diff:.2f}Hz)</h2>", unsafe_allow_html=True)
                 
-                if diff <= 10: # 오차 범위 10으로 수정
-                    st.balloons()
-                    st.markdown(f"<h1 style='text-align: center; color: #00CC66;'>🎊 성공!! (차이: {diff:.2f}Hz)</h1>", unsafe_allow_html=True)
-                    st.success("경품 당첨! 축하드립니다!")
-                else:
-                    st.markdown(f"<h3 style='text-align: center; color: #FF4B4B;'>아쉽습니다! (차이: {diff:.2f}Hz)</h3>", unsafe_allow_html=True)
-                
-                # 게임 모드에서도 그래프 2개 표시 (크기 축소 조정)
-                fig2, (gax1, gax2) = plt.subplots(2, 1, figsize=(10, 6))
-                
-                # 파형 그래프
-                librosa.display.waveshow(y, sr=sr, ax=gax1, color='#FF9E1B', alpha=0.8)
-                gax1.set_title('내 음성 파형', fontsize=10)
-                
-                # 주파수 스펙트럼 그래프
+                # 그래프 최적화 (2번째 주파수 분석 그래프만 출력)
+                fig2, ax = plt.subplots(figsize=(10, 3.5)) # 높이를 대폭 줄여 한 화면에 들어오게 함
                 n_fft = 2048
                 D = np.abs(librosa.stft(y, n_fft=n_fft))
                 avg_D = np.mean(D, axis=1)
                 freqs = librosa.fft_frequencies(sr=sr, n_fft=n_fft)
-                gax2.plot(freqs, avg_D, color='#1F3A5A', linewidth=1.5)
-                gax2.set_xlim(0, 1000)
-                gax2.axvline(x=st.session_state.target_hz, color='orange', linewidth=2, label=f'타겟: {st.session_state.target_hz}Hz')
-                gax2.axvline(x=avg_f0, color='red', linestyle='--', label=f'내 목소리: {avg_f0:.1f}Hz')
-                gax2.legend()
-                gax2.set_title('주파수 비교 분석', fontsize=10)
+                
+                ax.plot(freqs, avg_D, color='#1F3A5A', linewidth=2, label='내 목소리 성분')
+                ax.set_xlim(0, 800) # 게임 집중도를 위해 X축 범위 최적화
+                ax.axvline(x=st.session_state.target_hz, color='orange', linewidth=3, label=f'TARGET ({st.session_state.target_hz}Hz)')
+                ax.axvline(x=avg_f0, color='red', linestyle='--', linewidth=2, label=f'YOU ({avg_f0:.1f}Hz)')
+                ax.set_xlabel("진동수 (Hz)")
+                ax.set_ylabel("강도 (Amplitude)")
+                ax.legend(loc='upper right')
                 
                 plt.tight_layout()
                 st.pyplot(fig2)
             else:
-                st.warning("소리가 너무 작거나 감지되지 않았습니다. 다시 시도해주세요.")
+                st.warning("소리를 감지하지 못했습니다.")
         finally:
             if os.path.exists(game_tmp_path): os.remove(game_tmp_path)
