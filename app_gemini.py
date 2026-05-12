@@ -110,12 +110,12 @@ with tab2:
     if 'target_hz' not in st.session_state:
         st.session_state.target_hz = round(random.uniform(140.0, 300.0), 2)
 
-    # UI 레이아웃 최적화 (한 화면에 다 보이게 높이 조절)
-    st.markdown(f"<h1 style='text-align: center; color: #FF4B4B; margin-bottom: 0px;'>🎯 TARGET: {st.session_state.target_hz} Hz</h1>", unsafe_allow_html=True)
+    # 1. 타겟 표시 (상단 고정)
+    st.markdown(f"<h1 style='text-align: center; color: #FF4B4B; margin-bottom: 5px;'>🎯 TARGET: {st.session_state.target_hz} Hz</h1>", unsafe_allow_html=True)
     
     col_ctrl, col_btn = st.columns([3, 1])
     with col_ctrl:
-        st.write(f"💡 **미션:** 목소리를 내어 타겟 주파수를 맞추세요! (허용 오차: ±10Hz)")
+        st.caption(f"💡 미션: 목소리를 내어 타겟 주파수를 맞추세요! (허용 오차: ±10Hz)")
     with col_btn:
         if st.button("🔄 타겟 변경", use_container_width=True):
             st.session_state.target_hz = round(random.uniform(140.0, 300.0), 2)
@@ -136,34 +136,49 @@ with tab2:
             if not np.isnan(avg_f0):
                 diff = abs(avg_f0 - st.session_state.target_hz)
                 
-                # 결과 강조 구역
-                res_col1, res_col2 = st.columns(2)
+                # 2. 결과 수치 가로 배치 (중요!)
+                # 기록과 성공/실패 여부를 나란히 두어 세로 길이를 줄임
+                res_col1, res_col2 = st.columns([1, 1])
+                
                 with res_col1:
-                    st.markdown(f"<h2 style='text-align: center;'>기록: {avg_f0:.2f} Hz</h2>", unsafe_allow_html=True)
+                    st.markdown(f"<div style='background-color: #262730; padding: 10px; border-radius: 10px; text-align: center;'>"
+                                f"<p style='margin:0; font-size: 16px;'>나의 기록</p>"
+                                f"<h2 style='margin:0;'>{avg_f0:.2f} Hz</h2></div>", unsafe_allow_html=True)
+                
                 with res_col2:
                     if diff <= 10:
                         st.balloons()
-                        st.markdown(f"<h2 style='text-align: center; color: #00CC66;'>🎊 성공! (차이: {diff:.2f}Hz)</h2>", unsafe_allow_html=True)
+                        status_html = f"<h2 style='color: #00CC66; margin-top: 15px; text-align: center;'>🎊 성공! (-{diff:.2f})</h2>"
                     else:
-                        st.markdown(f"<h2 style='text-align: center; color: #FF4B4B;'>실패 (차이: {diff:.2f}Hz)</h2>", unsafe_allow_html=True)
+                        status_html = f"<h2 style='color: #FF4B4B; margin-top: 15px; text-align: center;'>❌ 실패 (+{diff:.2f})</h2>"
+                    st.markdown(status_html, unsafe_allow_html=True)
                 
-                # 그래프 최적화 (2번째 주파수 분석 그래프만 출력)
-                fig2, ax = plt.subplots(figsize=(10, 3.5)) # 높이를 대폭 줄여 한 화면에 들어오게 함
-                n_fft = 2048
-                D = np.abs(librosa.stft(y, n_fft=n_fft))
-                avg_D = np.mean(D, axis=1)
-                freqs = librosa.fft_frequencies(sr=sr, n_fft=n_fft)
+                st.write("") # 간격 조절
+
+                # 3. 그래프와 상세 데이터 가로 배치 (크기 최적화)
+                graph_col, info_col = st.columns([1.5, 1]) # 그래프 비중을 살짝 더 줌
                 
-                ax.plot(freqs, avg_D, color='#1F3A5A', linewidth=2, label='내 목소리 성분')
-                ax.set_xlim(0, 800) # 게임 집중도를 위해 X축 범위 최적화
-                ax.axvline(x=st.session_state.target_hz, color='orange', linewidth=3, label=f'TARGET ({st.session_state.target_hz}Hz)')
-                ax.axvline(x=avg_f0, color='red', linestyle='--', linewidth=2, label=f'YOU ({avg_f0:.1f}Hz)')
-                ax.set_xlabel("진동수 (Hz)")
-                ax.set_ylabel("강도 (Amplitude)")
-                ax.legend(loc='upper right')
+                with graph_col:
+                    fig2, ax = plt.subplots(figsize=(7, 3.5)) # 그래프 가로세로 비율 조정
+                    n_fft = 2048
+                    D = np.abs(librosa.stft(y, n_fft=n_fft))
+                    avg_D = np.mean(D, axis=1)
+                    freqs = librosa.fft_frequencies(sr=sr, n_fft=n_fft)
+                    
+                    ax.plot(freqs, avg_D, color='#1F3A5A', linewidth=2)
+                    ax.set_xlim(0, 600) # 더 좁게 잡아서 차이를 극명하게 보여줌
+                    ax.axvline(x=st.session_state.target_hz, color='orange', linewidth=3, label='TARGET')
+                    ax.axvline(x=avg_f0, color='red', linestyle='--', linewidth=2, label='YOU')
+                    ax.legend(prop={'size': 8})
+                    ax.tick_params(labelsize=8)
+                    plt.tight_layout()
+                    st.pyplot(fig2)
                 
-                plt.tight_layout()
-                st.pyplot(fig2)
+                with info_col:
+                    st.markdown("### 📊 분석 데이터")
+                    st.write(f"• **오차:** {diff:.2f} Hz")
+                    st.write(f"• **상태:** {'완벽한 음정!' if diff < 3 else '조금 더 노력하세요!'}")
+                    st.progress(max(0, min(1.0, 1 - (diff/100))), text="정확도")
             else:
                 st.warning("소리를 감지하지 못했습니다.")
         finally:
