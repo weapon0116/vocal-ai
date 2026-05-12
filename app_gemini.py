@@ -6,77 +6,64 @@ import matplotlib.pyplot as plt
 import google.generativeai as genai
 import tempfile
 import os
+import platform
 import matplotlib.font_manager as fm
 
-# --- [1. 시스템 설정: 한글 폰트 완벽 지원] ---
-# Streamlit Cloud (Ubuntu 기반)에서 한글 깨짐을 막기 위한 최적의 설정
+# --- [1. 디자인 및 폰트 설정] ---
+st.set_page_config(page_title="vocal_ai", layout="wide")
+
+# 상단 여백 제거 및 디자인 최적화
+st.markdown("""
+    <style>
+    .main .block-container { padding-top: 1rem; padding-bottom: 0rem; }
+    [data-testid="stVerticalBlock"] > div { padding-top: 0rem; padding-bottom: 0rem; margin-top: -0.2rem; }
+    .hz-font { font-size: 1.1rem !important; font-weight: 500; margin-top: -0.5rem !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
 @st.cache_resource
 def set_korean_font():
-    # 1. 윈도우/맥/리눅스 환경별로 폰트를 자동 검색합니다.
-    # 리눅스(Streamlit Cloud)에서 가장 흔한 나눔고딕, 백묵, 드로이드 폰트 등을 찾습니다.
-    available_fonts = [f.name for f in fm.fontManager.ttflist]
-    target_fonts = [
-        'Malgun Gothic',     # Windows
-        'AppleGothic',      # macOS
-        'NanumGothic',      # Linux (Ubuntu)
-        'Noto Sans CJK KR', # Linux
-        'Baekmuk Batang',   # Linux
-        'Droid Sans Fallback'# Linux
-    ]
-    
-    selected_font = 'sans-serif' # 기본값
-    for tf in target_fonts:
-        if tf in available_fonts:
-            selected_font = tf
-            break
-            
-    plt.rc('font', family=selected_font)
-    plt.rcParams['axes.unicode_minus'] = False # 마이너스 기호 깨짐 방지
-    
-    if selected_font == 'sans-serif':
-        st.warning("⚠️ 서버에 한글 폰트가 설치되지 않아 그래프의 한글이 깨질 수 있습니다. 'requirements.txt'에 'fonts-nanum' 등이 필요할 수 있습니다.")
+    # Streamlit Cloud(리눅스) 및 로컬 환경 한글 폰트 설정
+    font_path = '/usr/share/fonts/truetype/nanum/NanumGothic.ttf'
+    if os.path.exists(font_path):
+        font_prop = fm.FontProperties(fname=font_path)
+        plt.rc('font', family=font_prop.get_name())
     else:
-        st.success(f"✅ 그래프 한글 폰트 '{selected_font}' 설정 완료.")
+        # 로컬(윈도우/맥) 환경
+        if platform.system() == 'Windows': plt.rc('font', family='Malgun Gothic')
+        elif platform.system() == 'Darwin': plt.rc('font', family='AppleGothic')
+    plt.rcParams['axes.unicode_minus'] = False
 
 set_korean_font()
 
-# [보안] API 키 숨기기
+# --- [2. 보안 설정: API 키] ---
 if "GOOGLE_API_KEY" in st.secrets:
     GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
     genai.configure(api_key=GOOGLE_API_KEY)
 else:
-    st.warning("⚠️ API 키가 설정되지 않았습니다. Streamlit Secrets 설정을 확인하세요.")
+    st.error("⚠️ 시크릿 설정(Secrets)에서 GOOGLE_API_KEY를 확인해주세요.")
 
-st.set_page_config(page_title="vocal_ai", layout="wide")
-
-# --- [2. 핵심 함수: 가온 도 기준 남녀 판정] ---
+# --- [3. 핵심 함수] ---
 def analyze_gender_by_c4(avg_f0):
     C4_HZ = 261.63
-    if np.isnan(avg_f0):
-        return "측정 불가", "알 수 없음"
+    if np.isnan(avg_f0): return "측정 불가", "알 수 없음"
     
-    # 가온 도(C4) 기준 물리적 판정
     gender = "남성형 (Male-like)" if avg_f0 < C4_HZ else "여성형 (Female-like)"
-    
-    # 세부 음역대 판정
     if avg_f0 >= 261.63:
         vocal_range = "소프라노 (Soprano)" if avg_f0 >= 440 else "알토 (Alto)"
     else:
         vocal_range = "테너 (Tenor)" if avg_f0 >= 130 else "베이스 (Bass)"
-        
     return gender, vocal_range
 
 def play_piano_c4():
-    sr = 44100
-    duration = 1.0
-    f0 = 261.63
+    sr, duration, f0 = 44100, 1.0, 261.63
     t = np.linspace(0, duration, int(sr * duration), False)
     tone = (1.0 * np.sin(2 * np.pi * f0 * t) + 0.5 * np.sin(2 * np.pi * f0 * 2 * t))
     tone = tone * np.exp(-4 * t)
     return tone / np.max(np.abs(tone)), sr
 
-# --- [3. 메인 화면 구성] ---
-st.title("🎤 가온 도(C4) 기준 성별/음역대 정밀 분석")
+# --- [4. 메인 화면 디자인] ---
+st.title("🎤 상남자식 보컬 정밀 분석 (Gemini 3.1)")
 
 if st.button("🎹 기준점: 가온 도(C4) 듣기"):
     audio_buffer, sr_p = play_piano_c4()
@@ -84,16 +71,7 @@ if st.button("🎹 기준점: 가온 도(C4) 듣기"):
 
 st.divider()
 
-# 디자인 최적화 (상단 여백 줄이기)
-st.markdown("""
-<style>
-    .reportview-container .main .block-container{
-        padding-top: 2rem;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-audio_data = st.audio_input("마이크에 소리를 내주세요")
+audio_data = st.audio_input("여기에 목소리를 녹음해라")
 
 if audio_data:
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
@@ -101,29 +79,23 @@ if audio_data:
         tmp_path = tmp_file.name
 
     try:
-        # [빙글빙글] 분석 로딩창 시작
-        with st.spinner('🔍 목소리 파동 분석 중...'):
+        with st.spinner('🔍 주파수 분석 중...'):
             y, sr = librosa.load(tmp_path, sr=16000)
             y, _ = librosa.effects.trim(y)
             f0, _, _ = librosa.pyin(y, fmin=librosa.note_to_hz('C2'), fmax=librosa.note_to_hz('C6'))
             avg_f0 = np.nanmean(f0)
             gender_type, range_type = analyze_gender_by_c4(avg_f0)
 
-        # 결과 표시
-        st.subheader(f"✅ 분석 결과: {gender_type} / {range_type}")
-        # 한 줄 공백 제거 및 폰트 미세 조정
-        st.markdown(f"평균 주파수: **{avg_f0:.2f} Hz** (가온 도 261.63 Hz 대비 {'낮음' if avg_f0 < 261.63 else '높음'})", unsafe_allow_html=True)
+        st.subheader(f"✅ 판정: {gender_type} / {range_type}")
+        st.markdown(f'<div class="hz-font">평균 주파수: <b>{avg_f0:.2f} Hz</b> (가온 도 261.63 Hz 대비 {"낮음" if avg_f0 < 261.63 else "높음"})</div>', unsafe_allow_html=True)
         
-        col1, col2 = st.columns([1.2, 0.8])
+        col1, col2 = st.columns([1.2, 0.8], gap="medium")
         
         with col1:
-            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 7))
+            librosa.display.waveshow(y, sr=sr, ax=ax1, color='#0064FF', alpha=0.8)
+            ax1.set_title('그래프 1: 음성 파형', fontsize=10)
             
-            # 그래프 1: 시간축 파형
-            librosa.display.waveshow(y, sr=sr, ax=ax1, color='#0064FF', alpha=0.9)
-            ax1.set_title('그래프 1: 음성 에너지 파형', fontsize=12)
-            
-            # 그래프 2: 주파수 스펙트럼 (0~2000Hz)
             n_fft = 2048
             D = np.abs(librosa.stft(y, n_fft=n_fft))
             avg_D = np.mean(D, axis=1)
@@ -131,45 +103,30 @@ if audio_data:
             
             ax2.plot(freqs, avg_D, color='#1F3A5A', linewidth=2)
             ax2.set_xlim(0, 2000)
-            ax2.set_title('그래프 2: 주파수 성분 분석 (진동수 vs 진폭)', fontsize=12)
-            ax2.set_xlabel('진동수 (Hz)')
-            ax2.set_ylabel('진폭 (Amplitude)')
-            
-            # 가온 도(C4) 기준선 표시 (초록색, 범례 추가)
+            ax2.set_title('그래프 2: 주파수 분석 (Hz)', fontsize=10)
             ax2.axvline(x=261.63, color='green', linestyle=':', label='가온 도 (C4)')
-            # 사용자 평균 피크 표시 (빨간색, 범례 추가)
             if not np.isnan(avg_f0):
                 ax2.axvline(x=avg_f0, color='red', linestyle='--', label=f'내 목소리: {avg_f0:.1f}Hz')
-            
-            # 한글 깨짐 방지된 범례 표시
             ax2.legend()
-            
             plt.tight_layout()
             st.pyplot(fig)
 
         with col2:
-            # [빙글빙글] 제미나이 분석 로딩창
-            with st.spinner('🤖 Gemini AI가 음색을 리포팅하고 있습니다...'):
-                # 사용자 요청 모델 명시: gemini-3.1-flash-lite
+            with st.spinner('🤖 Gemini AI 리포트 생성 중...'):
                 model = genai.GenerativeModel("gemini-3.1-flash-lite")
                 sample_file = genai.upload_file(path=tmp_path)
                 
                 prompt = f"""
-                당신은 칭찬에 후한 보컬 코치입니다. 서론 없이 '결론'만 말하세요.
-                모든 답변은 짧고 강렬하게, 장점만 언급하세요.
-
-                분석 데이터: {avg_f0:.2f}Hz ({gender_type}).
-                1. [물리적 판정]: 왜 이 목소리가 {gender_type}로 분류되는지 가온 도(261.63Hz)와 짧게 비교.
-                2. [동물/가수 매칭]: 성별과 음색에 딱 맞는 동물 1마리와 가수 1명 추천.
+                칭찬에 후한 보컬 코치 스타일로 답변해라. 서론 없이 결론만 말해라.
+                데이터: {avg_f0:.2f}Hz ({gender_type}).
+                1. [물리적 분석]: 왜 {gender_type}인지 가온 도(261.63Hz)와 비교하여 짧고 굵게 설명.
+                2. [매칭]: 딱 맞는 동물 1마리와 가수 1명 추천.
                 """
-                
                 response = model.generate_content([sample_file, prompt])
-                st.info("📑 Gemini AI 매칭 리포트")
+                st.info("🤖 Gemini AI 보컬 리포트")
                 st.success(response.text)
 
     except Exception as e:
-        st.error(f"오류 발생: {e}")
+        st.error(f"오류: {e}")
     finally:
-        # 임시 파일 삭제
-        if os.path.exists(tmp_path): 
-            os.remove(tmp_path)
+        if os.path.exists(tmp_path): os.remove(tmp_path)
