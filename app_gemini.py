@@ -89,7 +89,7 @@ if audio_data:
         st.markdown("---")
         with st.spinner('🤖 AI 코치가 리포트를 작성 중입니다...'):
             # 가장 빠른 Flash 모델 사용
-            model = genai.GenerativeModel("gemini-1.5-flash") 
+            model = genai.GenerativeModel("gemini-3.1-flash-lite") 
             prompt = f"데이터: {avg_f0:.1f}Hz, {gender_type}, {range_type}. 1.판정이유, 2.동물, 3.가수(1명)를 3줄로 위트있게 작성."
             response = model.generate_content(prompt)
             st.markdown("### 🤖 AI Vocal Coach Report")
