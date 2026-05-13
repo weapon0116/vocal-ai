@@ -100,7 +100,7 @@ if audio_data:
             # 그래프 2: 주파수 분석 및 범례
             D = np.abs(librosa.stft(y, n_fft=2048))
             ax2.plot(librosa.fft_frequencies(sr=sr, n_fft=2048), np.mean(D, axis=1), color='#1F3A5A', label='주파수 밀도')
-            ax2.set_xlim(0, 1000)
+            ax2.set_xlim(0, 2000)
             ax2.set_title('주파수 성분 분석', fontsize=12)
             
             ax2.axvline(x=261.63, color='green', linestyle=':', linewidth=2, label='가온 도 (C4)')
