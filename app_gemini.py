@@ -60,7 +60,7 @@ def play_piano_c4():
     return tone / np.max(np.abs(tone)), sr
 
 # --- [4. 메인 화면 구성 (수정 전 재생바 스타일)] ---
-st.title("🎼 가온 도(C4) 기준 성별/음역대 정밀 분석 (v.py)")
+st.title("🎼 너의 목소리가 들려)")
 
 if st.button("🎹 기준점: 가온 도(C4) 듣기"):
     audio_buffer, sr_p = play_piano_c4()
@@ -69,7 +69,7 @@ if st.button("🎹 기준점: 가온 도(C4) 듣기"):
 
 st.divider()
 
-audio_data = st.audio_input("마이크에 소리를 내라")
+audio_data = st.audio_input("마이크에 소리를 내주세요")
 
 if audio_data:
     with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
@@ -123,7 +123,7 @@ if audio_data:
                 prompt = f"""
                 분석 데이터: {avg_f0:.2f}Hz ({gender_type}).
                 1. [물리적 판정]: 왜 이 목소리가 {gender_type}로 분류되는지 가온 도(261.63Hz)와 비교하여 설명해라.
-                2. [동물/가수 매칭]: 성별과 음색에 딱 맞는 동물 1마리와 가수 1명을 추천해라.
+                2. [동물/가수 매칭]: 성별과 음색에 딱 맞는 동물 1마리와 가수(계속 겹치지 않는) 1명을 추천해라.
                 짧고 명확하게 답변해라.
                 """
                 response = model.generate_content([sample_file, prompt])
