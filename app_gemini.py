@@ -78,7 +78,7 @@ if audio_data:
             avg_f0, gender_type, range_type = analyze_vocal_fast(y, sr)
             
             # 2. 제미나이 리포트 생성
-            model = genai.GenerativeModel("gemini-1.5-flash-lite") # 최신 모델명 권장
+            model = genai.GenerativeModel("gemini-3.1-flash-lite") # 최신 모델명 권장
             prompt = f"데이터: {avg_f0:.1f}Hz, {gender_type}, {range_type}. 다른 말은 하지 않고 1. 판정이유, 2. 비슷한 동물, 3. 비슷한 가수(1명)를 3줄로 형식에 맞추어 위트있게 작성."
             response = model.generate_content(prompt)
             report_text = response.text
